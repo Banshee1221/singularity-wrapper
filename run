@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+
+import json
+import click
+import os
+import subprocess
+import sys
+
+v=0.1
+
+container_dir="/tools/containers/"
+
+json_file='collection.json'
+
+def get_tools():
+    alphabet_used = []
+    for key in sorted(dictionary.keys()):
+        try:
+            desc = dictionary[key]['description'].split('\n')
+            desc = '\n'.join([(4 * ' ') + line.lstrip() for line in desc])
+        except Exception as a:
+            desc = "    No description"
+        if key[0].upper() not in alphabet_used:
+            print("\n "+key[0].upper()+" \n---")
+            alphabet_used.append(key[0].upper())
+        print(" >> "+key)
+        count = 0
+        for version in dictionary[key]['versions']:
+            if count+1 == len(dictionary[key]['versions']):
+                print("    └─"+version)
+            else:
+                count += 1
+                print("    ├─"+version)
+
+def run_tool(container, version_index, executable, args):
+    try:
+        tool = dictionary[container]['versions'][version_index]
+    except:
+        print("ERR: Please provide a valid container name.")
+        exit(1)
+    # app_path = os.path.join(container_dir, tool)
+    # os.environ["PATH"] += os.pathsep + app_path
+    job_name = "singularity exec {0} {1} {2}".format(
+        str(container_dir+container+'/'+tool),
+        executable,
+        ' '.join(args)
+    )
+    # print(job_name)
+    # print(job_name.split(' '))
+    process = subprocess.Popen(job_name, shell=True, stdout=sys.stdout, stderr=sys.stderr, universal_newlines=True).communicate()
+#    process = subprocess.Popen(job_name, shell=True, stdout=sys.stdout, stderr=sys.stderr, universal_newlines=True).communicate()
+#     p = subprocess.Popen(job_name,
+# #        stdout=subprocess.PIPE,
+# #        stderr=subprocess.PIPE,
+#         shell=True
+#     )
+    # out, err = p.communicate()
+    # print(out.decode('utf-8'))
+    # print(err.decode('utf-8'))
+
+@click.command(context_settings=dict(
+    ignore_unknown_options=True,
+))
+@click.option("--tools",
+    is_flag=True,
+    default=False,
+    help="(OPTIONAL) Display a list of all available containers and their versions.")
+@click.argument("container", required=False, nargs=1)
+@click.argument("executable", required=False, nargs=1)
+@click.argument('executable_args', nargs=-1, type=click.UNPROCESSED)
+@click.option("--version", required=False, help="Specify the version of the container you want to use. Must be full version string including .simg.")
+def run(tools, container, executable, executable_args, version):
+    """Singularity Container Runner
+
+    This tool is used to execute containers in a more
+    simple fashion.
+
+    To use it, execute "run <name_of_container_directory> <name_of_executable_inside_container> <arguments_to_pass_to_above_executable>"
+
+    You can use --version= to specify a version of the container if
+    there are more than one. Use --tools to get the names and versions
+    and specify the full string to use with --version=
+    """
+    if not (tools or container or executable or executable_args or version):
+        print("No command specified!")
+        exit(1)
+    if tools:
+        if container or executable or version:
+            print("===============================\n" + \
+                  "--tools INVOKED, SKIPPING OTHER\n" + \
+                  "===============================")
+        get_tools()
+        exit(0)
+    elif container and (not executable):
+        raise Exception("Executable name required for container!")
+    else:
+        default_version = True
+        version_index = 0
+        try:
+            version_index = dictionary[container]['versions'].index(version)
+            default_version = False
+        except:
+            pass
+        print("==========\n" + \
+              " SUMMARY: \n" + \
+              "==========")
+        print(" > Container: {}".format(container))
+        print(" > Executable: {}".format(executable))
+        print(" > Version: {} (DEFAULT)".format(dictionary[container]['versions'][version_index])) if default_version else print(" > Version: {}".format(dictionary[container]['versions'][version_index]))
+        print(" > Arguments: {}".format(executable_args))
+        print("\nExecuting...\n\n")
+        sys.stderr.flush()
+        sys.stdin.flush()
+        run_tool(container, version_index, executable, executable_args)
+
+if __name__ == '__main__':
+    dictionary = {}
+    with open(container_dir+json_file, 'r') as f:
+        dictionary = json.load(f)
+    run()
