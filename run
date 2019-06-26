@@ -6,11 +6,12 @@ import os
 import subprocess
 import sys
 
-v=0.1
+v=0.2
 
 container_dir="/tools/containers/"
-
 json_file='collection.json'
+# container_dir="/home/edebeste/Git/singularity-wrapper/"
+# json_file='collection.json'
 
 def get_tools():
     alphabet_used = []
@@ -58,8 +59,13 @@ def run_tool(container, version_index, executable, args):
     # print(out.decode('utf-8'))
     # print(err.decode('utf-8'))
 
+def print_help_msg(command):
+    with click.Context(command) as ctx:
+        click.echo(command.get_help(ctx))
+
 @click.command(context_settings=dict(
     ignore_unknown_options=True,
+    help_option_names=[],
 ))
 @click.option("--tools",
     is_flag=True,
@@ -81,8 +87,12 @@ def run(tools, container, executable, executable_args, version):
     there are more than one. Use --tools to get the names and versions
     and specify the full string to use with --version=
     """
+    if container == "--help" or container == "help":
+        print("HEY")
+        print_help_msg(run)
+        exit(1)
     if not (tools or container or executable or executable_args or version):
-        print("No command specified!")
+        print_help_msg(run)
         exit(1)
     if tools:
         if container or executable or version:
